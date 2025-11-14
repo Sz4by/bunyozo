@@ -1,48 +1,107 @@
-<!DOCTYPE html>
-<html lang="hu">
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HLS Proxy Lejátszó</title>
+    
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #000;
+        body, div, dl, dt, dd, ul, ol, li, h1, h2, h3, h4, h5, form, fieldset, p, button {
+            margin: 0; padding: 0;
         }
-        video {
-            width: 100vw;
-            height: 100vh;
+        body {
+            background-color: #f0f0f0; text-align: left; margin: 10px; width: 500px;
+        }
+        img, fieldset, iframe { border: 0 none transparent; }
+        ol, ul, dl { list-style: none outside none; }
+        li, dd { list-style: none; }
+        input, select, button { vertical-align: middle; }
+        img { vertical-align: top; }
+        em, address { font-style: normal; }
+        label, button { cursor: pointer; }
+        button { margin: 0; padding: 0; position: relative; }
+        a { color: #2f3743; text-decoration: none; }
+        a:hover { color: #3399FF; text-decoration: underline; }
+        body, iframe, form, img, p { margin: 0px; padding: 0px; border: 0px; }
+        .link1 { color: #33335b; text-decoration: none; font-weight: normal; }
+        a.link1:link, a.link1:active, a.link1:visited { color: #33335b; text-decoration: none; font-weight: normal; }
+        a.link1:hover { color: #08e3ff; text-decoration: none; font-weight: normal; }
+
+        /* --- popup.css --- */
+        #wrap { width: 100%; }
+        #wrap h1 { font-size: 12pt; }
+        #head_section { margin-top: 5px; margin-right: 5px; margin-bottom: 10px; margin-left: 5px; }
+        #body_section { margin: 5px; }
+        #url { width: 380px; }
+        #btn_play { width: 70px; }
+        #foot_section { margin: 8px; text-align: right; font-size: 9pt; }
+        
+        /* --- A lejátszó stílusa --- */
+        #videoPlayer {
+            width: 100%;
+            background-color: black;
+            margin-top: 15px;
+            display: none; /* Alapból rejtett, amíg el nem indítjuk */
         }
     </style>
 </head>
 <body>
 
+<div id="wrap" name="wrap">
+    <div id="head_section" name="head_section">
+        <h1>HLS Player</h1>
+    </div>
+    <div id="body_section" name="body_section">
+        <form name="frm1" id="frm1" onsubmit="return false;">
+            <div id="url_section" name="url_section">
+                URL <input type="text" name="url" id="url" value=""/>
+                <button type="button" name="btn_play" id="btn_play">Play</button>
+            </div>
+        </form>
+    </div>
+    
     <video id="videoPlayer" controls autoplay muted></video>
+    
+    <div id="foot_section" name="foot_section">
+        <a href="https://www.hlsplayer.org/" id="home_url" class="link1" target="_blank">https://www.hlsplayer.org/</a>
+    </div>
+</div>
 
-    <script>
+<script>
+    var hls = new Hls(); // Létrehozzuk a HLS lejátszót
+
+    // A "Play" gomb eseménykezelője
+    document.getElementById("btn_play").addEventListener("click", function() {
         var video = document.getElementById('videoPlayer');
+        var originalUrl = document.getElementById("url").value; // Kiolvassuk a linket a beviteli mezőből
+
+        if (!originalUrl) {
+            alert("Kérlek, adj meg egy URL-t!");
+            return;
+        }
         
-        // Az eredeti videó link, amit le akarsz játszani
-        var originalUrl = 'https://rpmshare.rpmstream.live/hls/3FNiDCLalONRYuc8i3pQfw/5w3/lod39pe8/8zl15z/tt/master.m3u8?v=1758651105';
+        console.log("Lejátszás indítása: " + originalUrl);
 
         // A videó URL-je most a *saját szerverünk* /proxy végpontjára mutat
         var proxyUrl = `/proxy?url=${encodeURIComponent(originalUrl)}`;
+        
+        video.style.display = 'block'; // Mutassuk a videó lejátszót
 
         if (Hls.isSupported()) {
-            var hls = new Hls();
             hls.loadSource(proxyUrl);
             hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, function() {
+            hls.on(Hls.Events.MANIFEST_PARSED, function () {
                 video.play();
             });
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            // A natív lejátszás (Safari) is működni fog a proxyval
             video.src = proxyUrl;
-            video.play();
+            video.addEventListener('loadedmetadata', function () {
+                video.play();
+            });
         }
-    </script>
+    });
+</script>
 
 </body>
 </html>
