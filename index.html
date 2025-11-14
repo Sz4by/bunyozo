@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HLS Proxy Lejátszó</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+        }
+        video {
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
+</head>
+<body>
+
+    <video id="videoPlayer" controls autoplay muted></video>
+
+    <script>
+        var video = document.getElementById('videoPlayer');
+        
+        // Az eredeti videó link, amit le akarsz játszani
+        var originalUrl = 'https://rpmshare.rpmstream.live/hls/3FNiDCLalONRYuc8i3pQfw/5w3/lod39pe8/8zl15z/tt/master.m3u8?v=1758651105';
+
+        // A videó URL-je most a *saját szerverünk* /proxy végpontjára mutat
+        var proxyUrl = `/proxy?url=${encodeURIComponent(originalUrl)}`;
+
+        if (Hls.isSupported()) {
+            var hls = new Hls();
+            hls.loadSource(proxyUrl);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                video.play();
+            });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            // A natív lejátszás (Safari) is működni fog a proxyval
+            video.src = proxyUrl;
+            video.play();
+        }
+    </script>
+
+</body>
+</html>
