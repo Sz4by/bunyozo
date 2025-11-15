@@ -77,7 +77,6 @@
             background-color: #357abd; 
         }
 
-        /* --- EZ AZ ÚJ RÉSZ: A KAPCSOLÓ --- */
         #proxy-switch-container {
             margin-top: 15px;
             display: flex;
@@ -89,7 +88,6 @@
         #proxy-toggle {
             cursor: pointer;
         }
-        /* ------------------------------ */
         
         #videoPlayer {
             width: 100%;
@@ -98,6 +96,15 @@
             border-radius: 5px;
             display: none; /* Alapból rejtett */
         }
+
+        /* --- EZ AZ ÚJ SOR: A JAVÍTÁS --- */
+        /* Eltünteti a fehér körvonalat, amikor rákattintasz a videóra */
+        video:focus, video:active, #videoPlayer:focus, #videoPlayer:active {
+            outline: none;
+            border: none;
+        }
+        /* ------------------------------ */
+
     </style>
 </head>
 <body>
@@ -132,22 +139,17 @@
             return;
         }
         
-        // ---- EZ AZ ÚJ LOGIKA ----
-        
         // 1. Ellenőrizzük a kapcsolót
         var useProxy = document.getElementById('proxy-toggle').checked;
         var finalUrl;
 
         if (useProxy) {
             console.log("Proxy használata: BE");
-            // A videó URL-je a *saját szerverünk* /proxy végpontjára mutat
             finalUrl = `/proxy?url=${encodeURIComponent(originalUrl)}`;
         } else {
             console.log("Proxy használata: KI (Közvetlen lejátszás)");
-            // Közvetlenül az eredeti linket használjuk
             finalUrl = originalUrl;
         }
-        // -------------------------
 
         console.log("Lejátszás indítása: " + finalUrl);
         video.style.display = 'block'; // Mutassuk a videó lejátszót
@@ -156,14 +158,12 @@
         var isHls = originalUrl.includes('.m3u8') || originalUrl.includes('.txt');
         
         if (isHls && Hls.isSupported()) {
-            // HLS stream (.m3u8, .txt) -> hls.js-t használunk
             hls.loadSource(finalUrl);
             hls.attachMedia(video);
             hls.on(Hls.Events.MANIFEST_PARSED, function () {
                 video.play();
             });
         } else if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
-            // Natív HLS (Safari)
             hls.detachMedia();
             video.src = finalUrl;
             video.addEventListener('loadedmetadata', function () {
@@ -171,7 +171,7 @@
             });
         } else {
             // Nem HLS (pl. Videa link, vagy .mp4)
-            hls.detachMedia(); // Ha előzőleg hls.js futott, leállítjuk
+            hls.detachMedia(); 
             video.src = finalUrl;
             video.play();
         }
