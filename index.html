@@ -33,14 +33,13 @@
             background-color: #1e1e1e;
             border-radius: 10px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-            box-sizing: border-box; /* Ez biztosítja, hogy a padding ne növelje meg a doboz méretét */
+            box-sizing: border-box; 
         }
 
         h1 {
             font-family: 'Orbitron', sans-serif; /* A menő betűtípus */
             text-align: center;
             font-size: 2.5em;
-            /* Színátmenet a címnek */
             background: linear-gradient(90deg, #4a90e2, #9013fe);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -49,11 +48,11 @@
 
         #url_section {
             display: flex;
-            gap: 10px; /* Térköz a beviteli mező és a gomb között */
+            gap: 10px; 
         }
 
         #url {
-            flex-grow: 1; /* A beviteli mező töltse ki a helyet */
+            flex-grow: 1; 
             padding: 10px;
             font-size: 1em;
             border: 1px solid #444;
@@ -67,7 +66,7 @@
             font-size: 1em;
             font-weight: bold;
             color: white;
-            background-color: #4a90e2; /* Kék gomb */
+            background-color: #4a90e2; 
             border: none;
             border-radius: 5px;
             cursor: pointer;
@@ -75,7 +74,7 @@
         }
         
         #btn_play:hover {
-            background-color: #357abd; /* Sötétebb kék hoverre */
+            background-color: #357abd; 
         }
         
         #videoPlayer {
@@ -94,7 +93,7 @@
     
     <form name="frm1" id="frm1" onsubmit="return false;">
         <div id="url_section" name="url_section">
-            <input type="text" name="url" id="url" placeholder="Illeszd be az .m3u8 vagy .txt linket..."/>
+            <input type="text" name="url" id="url" placeholder="Illeszd be a linket..."/>
             <button type="button" name="btn_play" id="btn_play">Play</button>
         </div>
     </form>
@@ -121,17 +120,34 @@
         
         video.style.display = 'block'; // Mutassuk a videó lejátszót
 
-        if (Hls.isSupported()) {
+        // ---- EZ AZ ÚJ, OKOSABB RÉSZ ----
+        
+        // Megnézzük, hogy HLS stream-e (a korábbi linkjeid)
+        var isHls = originalUrl.includes('.m3u8') || originalUrl.includes('.txt');
+        
+        if (isHls && Hls.isSupported()) {
+            // HLS stream (.m3u8, .txt) -> hls.js-t használunk
+            console.log("HLS stream indítása (hls.js-sel)");
             hls.loadSource(proxyUrl);
             hls.attachMedia(video);
             hls.on(Hls.Events.MANIFEST_PARSED, function () {
                 video.play();
             });
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        } else if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
+            // Natív HLS (Safari)
+            console.log("HLS stream indítása (natív)");
+            hls.detachMedia();
             video.src = proxyUrl;
             video.addEventListener('loadedmetadata', function () {
                 video.play();
             });
+        } else {
+            // Nem HLS (ez a Videa link, vagy egy .mp4)
+            // Közvetlenül beállítjuk a <video> tagnak a proxy URL-t
+            console.log("Közvetlen videó indítása (pl. MP4)");
+            hls.detachMedia(); // Ha előzőleg hls.js futott, leállítjuk
+            video.src = proxyUrl;
+            video.play();
         }
     });
 </script>
