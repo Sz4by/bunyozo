@@ -6,7 +6,6 @@ const { URL } = require('url');
 const WebSocket = require('ws');
 
 // --- BIZTONSÁGI KULCS ---
-// Ezt add meg a Render.com Environment Variables között!
 const BOT_SECRET_KEY = process.env.BOT_SECRET_KEY;
 if (!BOT_SECRET_KEY) {
     console.warn('FIGYELEM: A BOT_SECRET_KEY nincs beállítva! A bot nem fog tudni csatlakozni.');
@@ -17,7 +16,7 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 const port = process.env.PORT || 3000;
 
-// --- A PROXY RÉSZ (Változatlan) ---
+// --- A PROXY RÉSZ ---
 app.get('/proxy', async (req, res) => {
     const videoUrl = req.query.url;
     if (!videoUrl) return res.status(400).send('Hiányzó "url" paraméter');
@@ -52,7 +51,7 @@ app.get('/proxy', async (req, res) => {
     }
 });
 
-// --- A WEBOLDAL KISZOLGÁLÁSA (Változatlan) ---
+// --- A WEBOLDAL KISZOLGÁLÁSA ---
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
@@ -66,7 +65,6 @@ wss.on('connection', (ws) => {
         try {
             const data = JSON.parse(message);
             
-            // 1. lépés: Hitelesítés
             if (data.type === 'AUTH' && data.secret === BOT_SECRET_KEY) {
                 console.log('Discord Bot sikeresen hitelesítve és csatlakozva.');
                 authenticatedBot = ws;
@@ -74,17 +72,14 @@ wss.on('connection', (ws) => {
                 return;
             }
 
-            // 2. lépés: Ha a bot küldi a parancsot
             if (ws.isBot && data.type === 'PLAY_VIDEO') {
                 console.log(`[BOT] Play parancs továbbítása: ${data.url}`);
-                // Továbbítjuk az üzenetet az összes weboldalnak
                 webClients.forEach(client => {
                     if (client.readyState === WebSocket.OPEN) {
                         client.send(JSON.stringify(data));
                     }
                 });
             }
-
         } catch (e) {
             console.warn('Ismeretlen WebSocket üzenet:', message);
         }
@@ -100,7 +95,6 @@ wss.on('connection', (ws) => {
         }
     });
 
-    // Ha nem bot, adjuk hozzá a web kliensekhez
     if (!ws.isBot) {
         webClients.add(ws);
         console.log(`Web kliens csatlakozott. Jelenleg: ${webClients.size}`);
