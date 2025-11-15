@@ -6,12 +6,12 @@
     <title>Szaby Lejátszó</title>
     
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
 
     <style>
+        /* A stílus (CSS) rész nem változott, ugyanaz maradt... */
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
             font-family: Arial, sans-serif; background-color: #121212;
@@ -52,8 +52,6 @@
             border-radius: 5px; display: none;
         }
         video:focus, video:active { outline: none; border: none; }
-        
-        /* Csatlakozás állapota (EZ HIÁNYZOTT) */
         #status-light {
             width: 12px; height: 12px; border-radius: 50%;
             background-color: #f00; /* Piros = Nincs kapcsolat */
@@ -90,9 +88,10 @@
     var video = document.getElementById('videoPlayer');
     var urlInput = document.getElementById('url');
     var playButton = document.getElementById('btn_play');
-    var statusLight = document.getElementById('status-light'); // Ez új
+    var statusLight = document.getElementById('status-light');
+    var proxyToggle = document.getElementById('proxy-toggle'); // <<<--- ÚJ
 
-    // --- LEJÁTSZÓ FUNKCIÓ (Ez már megvolt nálad) ---
+    // --- LEJÁTSZÓ FUNKCIÓ ---
     function playVideo() {
         var originalUrl = urlInput.value;
         if (!originalUrl) {
@@ -100,7 +99,8 @@
             return;
         }
         
-        var useProxy = document.getElementById('proxy-toggle').checked;
+        // Kiolvassuk a kapcsoló állását
+        var useProxy = proxyToggle.checked;
         var finalUrl = useProxy ? `/proxy?url=${encodeURIComponent(originalUrl)}` : originalUrl;
 
         console.log(`Lejátszás indítása (${useProxy ? 'Proxyval' : 'Közvetlenül'}): ${finalUrl}`);
@@ -121,11 +121,10 @@
 
     playButton.addEventListener("click", playVideo);
     
-    // --- WEBSOCKET CSATLAKOZÁS (EZ A RÉSZ HIÁNYZOTT) ---
+    // --- WEBSOCKET CSATLAKOZÁS ---
     function connectWebSocket() {
-        // Kitalálja, hogy ws:// vagy wss:// (biztonságos) protokollt használjon
         const wsProtocol = (location.protocol === 'https:' ? 'wss:' : 'ws:');
-        const wsUrl = wsProtocol + '//' + location.host; // A render.com címed
+        const wsUrl = wsProtocol + '//' + location.host; 
         const ws = new WebSocket(wsUrl);
 
         ws.onopen = function() {
@@ -139,9 +138,14 @@
                 const data = JSON.parse(event.data);
                 console.log('Üzenet érkezett a szervertől:', data);
 
-                // Ha a bot 'PLAY_VIDEO' parancsot küldött
                 if (data.type === 'PLAY_VIDEO' && data.url) {
-                    urlInput.value = data.url; // Beírjuk a linket a mezőbe
+                    urlInput.value = data.url; // Beírjuk a linket
+                    
+                    // --- EZ AZ ÚJ RÉSZ ---
+                    // Beállítjuk a proxy kapcsolót a bot parancsa alapján
+                    proxyToggle.checked = data.useProxy;
+                    // ---------------------
+                    
                     playVideo(); // Elindítjuk a lejátszást
                 }
             } catch (e) {
@@ -153,7 +157,7 @@
             console.log('WebSocket kapcsolat bontva. Újracsatlakozás 3 másodperc múlva...');
             statusLight.style.backgroundColor = '#f00'; // Piros
             statusLight.title = 'Kapcsolat bontva';
-            setTimeout(connectWebSocket, 3000); // Próbáljunk újracsatlakozni
+            setTimeout(connectWebSocket, 3000);
         };
 
         ws.onerror = function(err) {
@@ -162,9 +166,7 @@
         };
     }
     
-    // Indítjuk a WebSocket kapcsolatot, amint az oldal betölt
     connectWebSocket();
-
 </script>
 
 </body>
