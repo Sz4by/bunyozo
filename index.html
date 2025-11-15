@@ -13,104 +13,62 @@
 
     <style>
         body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            font-family: Arial, sans-serif;
-            background-color: #121212; /* Sötét háttér */
-            color: #ffffff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column; /* Tartalom középre igazítása */
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            font-family: Arial, sans-serif; background-color: #121212;
+            color: #ffffff; display: flex; align-items: center;
+            justify-content: center; flex-direction: column;
         }
-        
         #player-container {
-            width: 90%;
-            max-width: 800px;
-            padding: 20px;
-            background-color: #1e1e1e;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-            box-sizing: border-box; 
+            width: 90%; max-width: 800px; padding: 20px;
+            background-color: #1e1e1e; border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); box-sizing: border-box; 
         }
-
         h1 {
-            font-family: 'Orbitron', sans-serif; /* A menő betűtípus */
-            text-align: center;
-            font-size: 2.5em;
-            background: linear-gradient(90deg, #4a90e2, #9013fe);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            font-family: 'Orbitron', sans-serif; text-align: center;
+            font-size: 2.5em; background: linear-gradient(90deg, #4a90e2, #9013fe);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
             margin-bottom: 25px;
         }
-
-        #url_section {
-            display: flex;
-            gap: 10px; 
-        }
-
+        #url_section { display: flex; gap: 10px; }
         #url {
-            flex-grow: 1; 
-            padding: 10px;
-            font-size: 1em;
-            border: 1px solid #444;
-            border-radius: 5px;
-            background-color: #2a2a2a;
-            color: #f0f0f0;
+            flex-grow: 1; padding: 10px; font-size: 1em;
+            border: 1px solid #444; border-radius: 5px;
+            background-color: #2a2a2a; color: #f0f0f0;
         }
-
         #btn_play {
-            padding: 10px 20px;
-            font-size: 1em;
-            font-weight: bold;
-            color: white;
-            background-color: #4a90e2; 
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
+            padding: 10px 20px; font-size: 1em; font-weight: bold;
+            color: white; background-color: #4a90e2; 
+            border: none; border-radius: 5px; cursor: pointer;
             transition: background-color 0.3s;
         }
-        
-        #btn_play:hover {
-            background-color: #357abd; 
-        }
-
+        #btn_play:hover { background-color: #357abd; }
         #proxy-switch-container {
-            margin-top: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            color: #ccc;
+            margin-top: 15px; display: flex; align-items: center;
+            justify-content: center; gap: 8px; color: #ccc;
         }
-        #proxy-toggle {
-            cursor: pointer;
-        }
-        
+        #proxy-toggle { cursor: pointer; }
         #videoPlayer {
-            width: 100%;
-            background-color: black;
-            margin-top: 20px;
-            border-radius: 5px;
-            display: none; /* Alapból rejtett */
+            width: 100%; background-color: black; margin-top: 20px;
+            border-radius: 5px; display: none;
         }
-
-        /* --- EZ AZ ÚJ SOR: A JAVÍTÁS --- */
-        /* Eltünteti a fehér körvonalat, amikor rákattintasz a videóra */
-        video:focus, video:active, #videoPlayer:focus, #videoPlayer:active {
-            outline: none;
-            border: none;
+        video:focus, video:active { outline: none; border: none; }
+        
+        /* Csatlakozás állapota (EZ HIÁNYZOTT) */
+        #status-light {
+            width: 12px; height: 12px; border-radius: 50%;
+            background-color: #f00; /* Piros = Nincs kapcsolat */
+            margin-left: auto; /* Jobbra tolja */
+            transition: background-color 0.5s;
         }
-        /* ------------------------------ */
-
     </style>
 </head>
 <body>
 
 <div id="player-container">
-    <h1>Szaby Lejátszó</h1>
+    <div style="display: flex; align-items: center; width: 100%;">
+        <h1>Szaby Lejátszó</h1>
+        <div id="status-light" title="Kapcsolat állapota"></div>
+    </div>
     
     <form name="frm1" id="frm1" onsubmit="return false;">
         <div id="url_section" name="url_section">
@@ -128,54 +86,85 @@
 </div>
 
 <script>
-    var hls = new Hls(); // Létrehozzuk a HLS lejátszót
+    var hls = new Hls();
+    var video = document.getElementById('videoPlayer');
+    var urlInput = document.getElementById('url');
+    var playButton = document.getElementById('btn_play');
+    var statusLight = document.getElementById('status-light'); // Ez új
 
-    document.getElementById("btn_play").addEventListener("click", function() {
-        var video = document.getElementById('videoPlayer');
-        var originalUrl = document.getElementById("url").value;
-
+    // --- LEJÁTSZÓ FUNKCIÓ (Ez már megvolt nálad) ---
+    function playVideo() {
+        var originalUrl = urlInput.value;
         if (!originalUrl) {
             alert("Kérlek, adj meg egy URL-t!");
             return;
         }
         
-        // 1. Ellenőrizzük a kapcsolót
         var useProxy = document.getElementById('proxy-toggle').checked;
-        var finalUrl;
+        var finalUrl = useProxy ? `/proxy?url=${encodeURIComponent(originalUrl)}` : originalUrl;
 
-        if (useProxy) {
-            console.log("Proxy használata: BE");
-            finalUrl = `/proxy?url=${encodeURIComponent(originalUrl)}`;
-        } else {
-            console.log("Proxy használata: KI (Közvetlen lejátszás)");
-            finalUrl = originalUrl;
-        }
+        console.log(`Lejátszás indítása (${useProxy ? 'Proxyval' : 'Közvetlenül'}): ${finalUrl}`);
+        video.style.display = 'block';
 
-        console.log("Lejátszás indítása: " + finalUrl);
-        video.style.display = 'block'; // Mutassuk a videó lejátszót
-
-        // Megnézzük, hogy HLS stream-e (az eredeti link alapján)
         var isHls = originalUrl.includes('.m3u8') || originalUrl.includes('.txt');
         
         if (isHls && Hls.isSupported()) {
             hls.loadSource(finalUrl);
             hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, function () {
-                video.play();
-            });
-        } else if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
-            hls.detachMedia();
-            video.src = finalUrl;
-            video.addEventListener('loadedmetadata', function () {
-                video.play();
-            });
+            hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
         } else {
-            // Nem HLS (pl. Videa link, vagy .mp4)
             hls.detachMedia(); 
             video.src = finalUrl;
             video.play();
         }
-    });
+    }
+
+    playButton.addEventListener("click", playVideo);
+    
+    // --- WEBSOCKET CSATLAKOZÁS (EZ A RÉSZ HIÁNYZOTT) ---
+    function connectWebSocket() {
+        // Kitalálja, hogy ws:// vagy wss:// (biztonságos) protokollt használjon
+        const wsProtocol = (location.protocol === 'https:' ? 'wss:' : 'ws:');
+        const wsUrl = wsProtocol + '//' + location.host; // A render.com címed
+        const ws = new WebSocket(wsUrl);
+
+        ws.onopen = function() {
+            console.log('WebSocket csatlakozva a szerverhez.');
+            statusLight.style.backgroundColor = '#0f0'; // Zöld
+            statusLight.title = 'Csatlakozva a bothoz';
+        };
+
+        ws.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                console.log('Üzenet érkezett a szervertől:', data);
+
+                // Ha a bot 'PLAY_VIDEO' parancsot küldött
+                if (data.type === 'PLAY_VIDEO' && data.url) {
+                    urlInput.value = data.url; // Beírjuk a linket a mezőbe
+                    playVideo(); // Elindítjuk a lejátszást
+                }
+            } catch (e) {
+                console.error('WebSocket üzenet hiba:', e);
+            }
+        };
+
+        ws.onclose = function() {
+            console.log('WebSocket kapcsolat bontva. Újracsatlakozás 3 másodperc múlva...');
+            statusLight.style.backgroundColor = '#f00'; // Piros
+            statusLight.title = 'Kapcsolat bontva';
+            setTimeout(connectWebSocket, 3000); // Próbáljunk újracsatlakozni
+        };
+
+        ws.onerror = function(err) {
+            console.error('WebSocket hiba:', err);
+            ws.close();
+        };
+    }
+    
+    // Indítjuk a WebSocket kapcsolatot, amint az oldal betölt
+    connectWebSocket();
+
 </script>
 
 </body>
