@@ -18,17 +18,24 @@ app.get('/proxy', async (req, res) => {
         return res.status(400).send('Hiányzó "url" paraméter');
     }
 
-    // ---- EZ AZ ÚJ, OKOSABB RÉSZ ----
-    // Megnézzük, hogy a link .m3u8 VAGY .txt-e
-    const isManifest = videoUrl.endsWith('.m3u8') || videoUrl.endsWith('.txt');
+    // Megnézzük, hogy HLS stream-e (a korábbi linkjeid)
+    const isManifest = videoUrl.includes('.m3u8') || videoUrl.includes('.txt');
+    
+    // ---- EZ AZ ÚJ RÉSZ ----
+    // Lekérjük az eredeti URL "gyökerét" (pl. "https://video1.videa.hu")
+    const urlObj = new URL(videoUrl);
+    const origin = urlObj.origin;
+    // -------------------------
 
     try {
         const response = await axios.get(videoUrl, {
-            // Ha manifest (.m3u8 vagy .txt), akkor szövegként, 
-            // egyébként (pl. .ts, .woff2) bináris adatként kérjük le.
             responseType: isManifest ? 'text' : 'arraybuffer',
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                
+                // ---- EZ AZ ÚJ SOR ----
+                // Hozzáadjuk a Referer fejlécet, hogy becsapjuk a szervert
+                'Referer': origin
             }
         });
 
@@ -37,20 +44,15 @@ app.get('/proxy', async (req, res) => {
         res.setHeader('Access-Control-Allow-Origin', '*');
 
         if (isManifest) {
-            // **A LEGFONTOSABB RÉSZ:** Átírjuk a manifest (.m3u8 vagy .txt) tartalmát
+            // Átírjuk az .m3u8 vagy .txt tartalmát
             let manifest = response.data;
-            
-            // Minden sort, ami egy link (nem # kezdetű), átírunk, 
-            // hogy az is a mi proxy-nkon keresztül jöjjön (legyen az .ts vagy .woff2)
             manifest = manifest.replace(/^(?!#)(.*)$/gm, (match) => {
                 const absoluteUrl = new URL(match, videoUrl).href;
-                // Az URL-t átalakítjuk: /proxy?url=[az eredeti videó darab linkje]
                 return `/proxy?url=${encodeURIComponent(absoluteUrl)}`;
             });
-            
             res.send(manifest);
         } else {
-            // Ha .ts vagy .woff2 (videó darab) fájl, csak küldjük a bináris adatot
+            // .ts, .woff2, vagy a Videa .mp4 fájl
             res.send(response.data);
         }
 
