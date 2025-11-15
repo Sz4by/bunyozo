@@ -76,6 +76,20 @@
         #btn_play:hover {
             background-color: #357abd; 
         }
+
+        /* --- EZ AZ ÚJ RÉSZ: A KAPCSOLÓ --- */
+        #proxy-switch-container {
+            margin-top: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: #ccc;
+        }
+        #proxy-toggle {
+            cursor: pointer;
+        }
+        /* ------------------------------ */
         
         #videoPlayer {
             width: 100%;
@@ -98,6 +112,11 @@
         </div>
     </form>
     
+    <div id="proxy-switch-container">
+        <input type="checkbox" id="proxy-toggle" checked>
+        <label for="proxy-toggle">Proxy használata (CORS hibák kikerülésére)</label>
+    </div>
+    
     <video id="videoPlayer" controls autoplay muted></video>
 </div>
 
@@ -113,40 +132,47 @@
             return;
         }
         
-        console.log("Lejátszás indítása: " + originalUrl);
-
-        // A videó URL-je most a *saját szerverünk* /proxy végpontjára mutat
-        var proxyUrl = `/proxy?url=${encodeURIComponent(originalUrl)}`;
+        // ---- EZ AZ ÚJ LOGIKA ----
         
+        // 1. Ellenőrizzük a kapcsolót
+        var useProxy = document.getElementById('proxy-toggle').checked;
+        var finalUrl;
+
+        if (useProxy) {
+            console.log("Proxy használata: BE");
+            // A videó URL-je a *saját szerverünk* /proxy végpontjára mutat
+            finalUrl = `/proxy?url=${encodeURIComponent(originalUrl)}`;
+        } else {
+            console.log("Proxy használata: KI (Közvetlen lejátszás)");
+            // Közvetlenül az eredeti linket használjuk
+            finalUrl = originalUrl;
+        }
+        // -------------------------
+
+        console.log("Lejátszás indítása: " + finalUrl);
         video.style.display = 'block'; // Mutassuk a videó lejátszót
 
-        // ---- EZ AZ ÚJ, OKOSABB RÉSZ ----
-        
-        // Megnézzük, hogy HLS stream-e (a korábbi linkjeid)
+        // Megnézzük, hogy HLS stream-e (az eredeti link alapján)
         var isHls = originalUrl.includes('.m3u8') || originalUrl.includes('.txt');
         
         if (isHls && Hls.isSupported()) {
             // HLS stream (.m3u8, .txt) -> hls.js-t használunk
-            console.log("HLS stream indítása (hls.js-sel)");
-            hls.loadSource(proxyUrl);
+            hls.loadSource(finalUrl);
             hls.attachMedia(video);
             hls.on(Hls.Events.MANIFEST_PARSED, function () {
                 video.play();
             });
         } else if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
             // Natív HLS (Safari)
-            console.log("HLS stream indítása (natív)");
             hls.detachMedia();
-            video.src = proxyUrl;
+            video.src = finalUrl;
             video.addEventListener('loadedmetadata', function () {
                 video.play();
             });
         } else {
-            // Nem HLS (ez a Videa link, vagy egy .mp4)
-            // Közvetlenül beállítjuk a <video> tagnak a proxy URL-t
-            console.log("Közvetlen videó indítása (pl. MP4)");
+            // Nem HLS (pl. Videa link, vagy .mp4)
             hls.detachMedia(); // Ha előzőleg hls.js futott, leállítjuk
-            video.src = proxyUrl;
+            video.src = finalUrl;
             video.play();
         }
     });
