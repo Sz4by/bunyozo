@@ -1,93 +1,113 @@
 const express = require('express');
 const axios = require('axios');
 const path = require('path');
+const http = require('http');
 const { URL } = require('url');
+const WebSocket = require('ws');
+
+// --- BIZTONSÁGI KULCS ---
+// Ezt add meg a Render.com Environment Variables között!
+const BOT_SECRET_KEY = process.env.BOT_SECRET_KEY;
+if (!BOT_SECRET_KEY) {
+    console.warn('FIGYELEM: A BOT_SECRET_KEY nincs beállítva! A bot nem fog tudni csatlakozni.');
+}
 
 const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
 const port = process.env.PORT || 3000;
 
-// 1. A lejátszó (index.html) kiszolgálása
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// 2. A proxy végpont
+// --- A PROXY RÉSZ (Változatlan) ---
 app.get('/proxy', async (req, res) => {
     const videoUrl = req.query.url;
-    if (!videoUrl) {
-        return res.status(400).send('Hiányzó "url" paraméter');
-    }
-
+    if (!videoUrl) return res.status(400).send('Hiányzó "url" paraméter');
     const isManifest = videoUrl.includes('.m3u8') || videoUrl.includes('.txt');
     const origin = new URL(videoUrl).origin;
-
     const headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Referer': origin
     };
-
     try {
-        let response;
-        try {
-            // Első kérés:
-            response = await axios.get(videoUrl, {
-                // ---- EZ A VÁLTOZÁS (1) ----
-                // Ha manifest (szöveg), akkor 'text', egyébként 'stream'-et kérünk (nem 'arraybuffer'-t)
-                responseType: isManifest ? 'text' : 'stream', 
-                headers: headers,
-                maxRedirects: 0,
-                validateStatus: (status) => (status >= 200 && status < 400)
-            });
-        } catch (error) {
-            console.error('Proxy hiba (1. kérés):', error.message);
-            return res.status(500).send('Hiba a videó tartalmának letöltése közben (1. kérés)');
-        }
-
-        // Átirányítás kezelése
+        let response = await axios.get(videoUrl, {
+            responseType: isManifest ? 'text' : 'stream',
+            headers: headers, maxRedirects: 0, validateStatus: (status) => (status >= 200 && status < 400)
+        });
         if (response.status >= 300 && response.status < 400 && response.headers.location) {
             let redirectUrl = response.headers.location;
-            if (redirectUrl.startsWith('/')) {
-                redirectUrl = `${origin}${redirectUrl}`;
-            }
-            console.log('Átirányítás észlelve, új URL:', redirectUrl);
-
-            // Második kérés (a végleges URL-re)
-            response = await axios.get(redirectUrl, {
-                // ---- EZ A VÁLTOZÁS (2) ----
-                responseType: isManifest ? 'text' : 'stream', // Itt is stream-et kérünk
-                headers: headers
-            });
+            if (redirectUrl.startsWith('/')) redirectUrl = `${origin}${redirectUrl}`;
+            response = await axios.get(redirectUrl, { responseType: isManifest ? 'text' : 'stream', headers: headers });
         }
-
-        // --- VÁLASZ FELDOLGOZÁSA ---
-        const contentType = response.headers['content-type'];
-        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Type', response.headers['content-type']);
         res.setHeader('Access-Control-Allow-Origin', '*');
-
         if (isManifest) {
-            // Az .m3u8 fájlokat (szöveg) átírjuk és elküldjük
-            let manifest = response.data;
-            manifest = manifest.replace(/^(?!#)(.*)$/gm, (match) => {
-                const absoluteUrl = new URL(match, videoUrl).href;
-                return `/proxy?url=${encodeURIComponent(absoluteUrl)}`;
-            });
+            let manifest = response.data.replace(/^(?!#)(.*)$/gm, (match) => 
+                `/proxy?url=${encodeURIComponent(new URL(match, videoUrl).href)}`
+            );
             res.send(manifest);
         } else {
-            // ---- EZ A VÁLTOZÁS (3) ----
-            // A videó stream-et (pl. .mp4, .ts) nem töltjük le, hanem
-            // egyenesen "átpumpáljuk" (pipe) a felhasználóhoz.
-            // Ez tartja alacsonyan a RAM használatot.
             response.data.pipe(res);
         }
-
     } catch (error) {
-        console.error('Proxy hiba (feldolgozás):', error.message);
-        if (!res.headersSent) {
-            res.status(500).send('Hiba a videó tartalmának feldolgozása közben');
-        }
+        if (!res.headersSent) res.status(500).send('Proxy hiba');
     }
 });
 
-app.listen(port, () => {
-    console.log(`HLS proxy szerver elindult a ${port} porton`);
+// --- A WEBOLDAL KISZOLGÁLÁSA (Változatlan) ---
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// --- WEBSOCKET "RÁDIÓTORONY" ---
+const webClients = new Set(); // A csatlakozott böngészők
+let authenticatedBot = null; // A csatlakozott bot
+
+wss.on('connection', (ws) => {
+    ws.on('message', (message) => {
+        try {
+            const data = JSON.parse(message);
+            
+            // 1. lépés: Hitelesítés
+            if (data.type === 'AUTH' && data.secret === BOT_SECRET_KEY) {
+                console.log('Discord Bot sikeresen hitelesítve és csatlakozva.');
+                authenticatedBot = ws;
+                ws.isBot = true;
+                return;
+            }
+
+            // 2. lépés: Ha a bot küldi a parancsot
+            if (ws.isBot && data.type === 'PLAY_VIDEO') {
+                console.log(`[BOT] Play parancs továbbítása: ${data.url}`);
+                // Továbbítjuk az üzenetet az összes weboldalnak
+                webClients.forEach(client => {
+                    if (client.readyState === WebSocket.OPEN) {
+                        client.send(JSON.stringify(data));
+                    }
+                });
+            }
+
+        } catch (e) {
+            console.warn('Ismeretlen WebSocket üzenet:', message);
+        }
+    });
+
+    ws.on('close', () => {
+        if (ws.isBot) {
+            console.log('Discord Bot lecsatlakozott.');
+            authenticatedBot = null;
+        } else {
+            webClients.delete(ws);
+            console.log(`Web kliens lecsatlakozott. Maradt: ${webClients.size}`);
+        }
+    });
+
+    // Ha nem bot, adjuk hozzá a web kliensekhez
+    if (!ws.isBot) {
+        webClients.add(ws);
+        console.log(`Web kliens csatlakozott. Jelenleg: ${webClients.size}`);
+    }
+});
+
+// --- SZERVER INDÍTÁSA ---
+server.listen(port, () => {
+    console.log(`Szaby Lejátszó központ (Web+Proxy+WebSocket) elindult a ${port} porton`);
 });
