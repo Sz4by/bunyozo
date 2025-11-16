@@ -89,9 +89,9 @@
     var urlInput = document.getElementById('url');
     var playButton = document.getElementById('btn_play');
     var statusLight = document.getElementById('status-light');
-    var proxyToggle = document.getElementById('proxy-toggle'); // <<<--- ÚJ
+    var proxyToggle = document.getElementById('proxy-toggle');
 
-    // --- LEJÁTSZÓ FUNKCIÓ ---
+    // --- LEJÁTSZÓ FUNKCIÓ (JAVÍTOTT) ---
     function playVideo() {
         var originalUrl = urlInput.value;
         if (!originalUrl) {
@@ -108,12 +108,40 @@
 
         var isHls = originalUrl.includes('.m3u8') || originalUrl.includes('.txt');
         
+        // --- INNENTŐL VÁLTOZOTT ---
+
+        // 1. MINDIG megsemmisítjük az előző HLS példányt (ha volt)
+        // Ez a legfontosabb lépés, ami hiányzott.
+        if (hls) {
+            hls.destroy();
+        }
+
+        // 2. Ha az ÚJ videó HLS és a böngésző támogatja:
         if (isHls && Hls.isSupported()) {
+            
+            // 3. Létrehozunk egy TELJESEN ÚJ HLS példányt
+            hls = new Hls(); 
+            
+            // 4. Betöltjük az új forrást és csatlakoztatjuk
             hls.loadSource(finalUrl);
             hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+            
+            // 5. Beállítjuk az eseményfigyelőt, hogy induljon a lejátszás
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                video.play();
+            });
+
+            // Opcionális: hibakezelés, ha baj van a streammel
+            hls.on(Hls.Events.ERROR, function (event, data) {
+                if (data.fatal) {
+                    console.error('Végzetes HLS hiba:', data);
+                }
+            });
+
         } else {
-            hls.detachMedia(); 
+            // 6. Ha nem HLS (pl. MP4), vagy a HLS nem támogatott:
+            // Egyszerűen beállítjuk a videó forrását.
+            // (Az hls.destroy() már megtörtént fent, így a <video> elem "szabad")
             video.src = finalUrl;
             video.play();
         }
@@ -136,7 +164,7 @@
         ws.onmessage = function(event) {
             try {
                 const data = JSON.parse(event.data);
-                console.log('Üzenet érkezett a szervertől:', data);
+                console.log('Üzenet érkezett a szerverről:', data);
 
                 if (data.type === 'PLAY_VIDEO' && data.url) {
                     urlInput.value = data.url; // Beírjuk a linket
