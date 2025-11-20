@@ -4,136 +4,111 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Szaby Lejátszó</title>
-    
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
-
     <style>
-        body, html {
-            margin: 0; padding: 0; width: 100%; height: 100%;
-            font-family: Arial, sans-serif; background-color: #121212;
-            color: #ffffff; display: flex; align-items: center;
-            justify-content: center; flex-direction: column;
+        body { 
+            margin: 0; background: #121212; color: white; font-family: Arial; 
+            display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column;
+            overflow: hidden; 
         }
-        #player-container {
-            width: 90%; max-width: 800px; padding: 20px;
-            background-color: #1e1e1e; border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); box-sizing: border-box; 
-        }
-        h1 {
-            font-family: 'Orbitron', sans-serif; text-align: center;
-            font-size: 2.5em; background: linear-gradient(90deg, #4a90e2, #9013fe);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            margin-bottom: 25px;
-        }
-        #url_section { display: flex; gap: 10px; flex-wrap: wrap; }
-        #url {
-            flex-grow: 1; padding: 10px; font-size: 1em;
-            border: 1px solid #444; border-radius: 5px;
-            background-color: #2a2a2a; color: #f0f0f0;
-            min-width: 200px;
-        }
-        /* Play gomb stílusa */
-        #btn_play {
-            padding: 10px 20px; font-size: 1em; font-weight: bold;
-            color: white; background-color: #4a90e2; 
-            border: none; border-radius: 5px; cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        #btn_play:hover { background-color: #357abd; }
+        /* Mozi mód: Eltüntet mindent, csak a videó marad */
+        body.cinema-mode #controls, body.cinema-mode h1 { display: none !important; }
+        body.cinema-mode #player-container { width: 100%; height: 100%; max-width: none; padding: 0; background: black; }
+        body.cinema-mode video { height: 100vh; }
 
-        /* Új ablak gomb stílusa (ZÖLD) */
-        #btn_window {
-            padding: 10px 20px; font-size: 1em; font-weight: bold;
-            color: white; background-color: #28a745;
-            border: none; border-radius: 5px; cursor: pointer;
-            transition: background-color 0.3s;
-            white-space: nowrap;
+        #player-container { 
+            width: 90%; max-width: 800px; padding: 20px; background: #1e1e1e; 
+            border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
-        #btn_window:hover { background-color: #218838; }
-
-        #proxy-switch-container {
-            margin-top: 15px; display: flex; align-items: center;
-            justify-content: center; gap: 8px; color: #ccc;
+        h1 { 
+            font-family: 'Orbitron'; text-align: center; margin: 0 0 20px 0;
+            background: linear-gradient(90deg, #4a90e2, #9013fe); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
-        #proxy-toggle { cursor: pointer; }
-        #videoPlayer {
-            width: 100%; background-color: black; margin-top: 20px;
-            border-radius: 5px; display: none;
-        }
-        video:focus, video:active { outline: none; border: none; }
-        #status-light {
-            width: 12px; height: 12px; border-radius: 50%;
-            background-color: #f00; /* Piros = Nincs kapcsolat */
-            margin-left: auto; /* Jobbra tolja */
-            transition: background-color 0.5s;
-        }
+        input { padding: 10px; width: 60%; background: #2a2a2a; border: 1px solid #444; color: white; border-radius: 5px; }
+        button { padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; color: white; }
+        #btn_play { background: #4a90e2; }
+        #btn_window { background: #28a745; }
+        video { width: 100%; display: none; background: black; margin-top: 15px; border-radius: 5px; }
+        #controls { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px; }
+        .switch { display: flex; align-items: center; gap: 5px; font-size: 0.9em; color: #ccc; justify-content: center; }
     </style>
 </head>
 <body>
 
 <div id="player-container">
-    <div style="display: flex; align-items: center; width: 100%;">
-        <h1>Szaby Lejátszó</h1>
-        <div id="status-light" title="Kapcsolat állapota"></div>
+    <h1>Szaby Lejátszó</h1>
+    
+    <div id="controls">
+        <input type="text" id="url" placeholder="Videó link...">
+        <button id="btn_play">Play</button>
+        <button id="btn_window">❐ Új ablak</button>
     </div>
     
-    <form name="frm1" id="frm1" onsubmit="return false;">
-        <div id="url_section" name="url_section">
-            <input type="text" name="url" id="url" placeholder="Illeszd be a linket..."/>
-            <button type="button" name="btn_play" id="btn_play">Play</button>
-            <button type="button" id="btn_window" title="Megnyitás külön ablakban">❐ Új ablak</button>
-        </div>
-    </form>
-    
-    <div id="proxy-switch-container">
+    <div id="controls" class="switch">
         <input type="checkbox" id="proxy-toggle" checked>
-        <label for="proxy-toggle">Proxy használata (CORS hibák kikerülésére)</label>
+        <label for="proxy-toggle">Proxy (CloudDataCDN-hez kötelező)</label>
     </div>
-    
-    <video id="videoPlayer" controls autoplay muted></video>
+
+    <video id="videoPlayer" controls autoplay></video>
 </div>
 
 <script>
-    var hls = new Hls();
-    var video = document.getElementById('videoPlayer');
-    var urlInput = document.getElementById('url');
-    var playButton = document.getElementById('btn_play');
-    var windowButton = document.getElementById('btn_window'); // Gomb referencia
-    var statusLight = document.getElementById('status-light');
-    var proxyToggle = document.getElementById('proxy-toggle');
+    const video = document.getElementById('videoPlayer');
+    const urlInput = document.getElementById('url');
+    const proxyToggle = document.getElementById('proxy-toggle');
+    let hls;
 
-    // --- 1. HELYI LEJÁTSZÁS FUNKCIÓ ---
-    function playVideo() {
-        var originalUrl = urlInput.value;
-        if (!originalUrl) {
-            alert("Kérlek, adj meg egy URL-t!");
-            return;
+    // 1. OLDAL BETÖLTÉSE (Paraméterek figyelése)
+    window.onload = () => {
+        const params = new URLSearchParams(location.search);
+        if (params.has('url')) {
+            urlInput.value = params.get('url');
+            // Ha 'proxy' paraméter 'true', bepipáljuk. Ha 'false', kivesszük.
+            proxyToggle.checked = (params.get('proxy') === 'true');
+            
+            if (params.get('cinema') === 'true') {
+                document.body.classList.add('cinema-mode');
+            }
+            playVideo();
         }
-        
-        var useProxy = proxyToggle.checked;
-        var finalUrl = useProxy ? `/proxy?url=${encodeURIComponent(originalUrl)}` : originalUrl;
+        connectWs();
+    };
 
-        console.log(`Helyi lejátszás indítása (${useProxy ? 'Proxyval' : 'Közvetlenül'}): ${finalUrl}`);
+    // 2. LEJÁTSZÁS LOGIKA (Ez dönti el: Direkt vagy Proxy)
+    function playVideo() {
+        const originalUrl = urlInput.value.trim();
+        if (!originalUrl) return alert('Nincs URL!');
+
+        const useProxy = proxyToggle.checked;
+        
+        // ITT A LÉNYEG:
+        // Ha useProxy = false -> finalUrl = originalUrl (DIREKT KAPCSOLAT)
+        // Ha useProxy = true  -> finalUrl = /proxy... (SZERVEREN ÁT)
+        const finalUrl = useProxy ? `/proxy?url=${encodeURIComponent(originalUrl)}` : originalUrl;
+
+        console.log(`Indítás: ${useProxy ? 'PROXY' : 'DIREKT'} -> ${finalUrl}`);
         video.style.display = 'block';
 
-        var isHls = originalUrl.includes('.m3u8') || originalUrl.includes('.txt');
-        
-        if (hls) {
-            hls.destroy();
-        }
+        if (hls) hls.destroy();
+
+        // HLS felismerése (CloudDataCDN és m3u8)
+        const isHls = originalUrl.includes('.m3u8') || 
+                      originalUrl.includes('cloudatacdn') || 
+                      (useProxy && !originalUrl.includes('.mp4'));
 
         if (isHls && Hls.isSupported()) {
-            hls = new Hls(); 
+            hls = new Hls();
             hls.loadSource(finalUrl);
             hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                video.play();
-            });
-            hls.on(Hls.Events.ERROR, function (event, data) {
-                if (data.fatal) { console.error('Végzetes HLS hiba:', data); }
+            hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+            hls.on(Hls.Events.ERROR, (e, data) => {
+                if (data.fatal) {
+                    console.warn('HLS hiba, próba natívan...');
+                    hls.destroy();
+                    video.src = finalUrl;
+                    video.play();
+                }
             });
         } else {
             video.src = finalUrl;
@@ -141,63 +116,33 @@
         }
     }
 
-    playButton.addEventListener("click", playVideo);
+    document.getElementById('btn_play').onclick = playVideo;
 
-    // --- 2. ÚJ ABLAK FUNKCIÓ ---
-    windowButton.addEventListener("click", function() {
-        var originalUrl = urlInput.value;
-        if (!originalUrl) {
-            alert("Kérlek, adj meg egy URL-t!");
-            return;
-        }
+    // 3. ÚJ ABLAK GOMB
+    document.getElementById('btn_window').onclick = () => {
+        const url = urlInput.value.trim();
+        if (!url) return alert('Nincs URL!');
+        // Átadjuk a jelenlegi Proxy beállítást az új ablaknak
+        const target = `/?url=${encodeURIComponent(url)}&proxy=${proxyToggle.checked}&cinema=true`;
+        window.open(target, '_blank', 'width=900,height=600');
+    };
 
-        // Megnézzük, kértek-e proxy-t a checkboxszal
-        var useProxy = proxyToggle.checked;
-
-        // Ha proxy kell: /proxy-link/URL
-        // Ha NEM kell: /direct-link/URL
-        var routePrefix = useProxy ? '/proxy-link/' : '/direct-link/';
-        
-        // Teljes URL összeállítása (pl. https://te-oldalad.com/direct-link/https://video.mp4)
-        var finalOpenUrl = window.location.origin + routePrefix + originalUrl;
-        
-        console.log(`Ablak nyitása: ${finalOpenUrl}`);
-        window.open(finalOpenUrl, '_blank');
-    });
-    
-    // --- 3. WEBSOCKET CSATLAKOZÁS ---
-    function connectWebSocket() {
-        const wsProtocol = (location.protocol === 'https:' ? 'wss:' : 'ws:');
-        const wsUrl = wsProtocol + '//' + location.host; 
-        const ws = new WebSocket(wsUrl);
-
-        ws.onopen = function() {
-            console.log('WebSocket csatlakozva.');
-            statusLight.style.backgroundColor = '#0f0'; 
-            statusLight.title = 'Csatlakozva';
-        };
-
-        ws.onmessage = function(event) {
+    // 4. WEBSOCKET (Opcionális)
+    function connectWs() {
+        const ws = new WebSocket((location.protocol=='https:'?'wss:':'ws:')+'//'+location.host);
+        ws.onmessage = (e) => {
             try {
-                const data = JSON.parse(event.data);
-                if (data.type === 'PLAY_VIDEO' && data.url) {
-                    urlInput.value = data.url; 
-                    proxyToggle.checked = data.useProxy; // Szinkronizáljuk a proxy kapcsolót is
-                    playVideo(); 
+                const d = JSON.parse(e.data);
+                if (d.type === 'PLAY_VIDEO') {
+                    urlInput.value = d.url;
+                    proxyToggle.checked = d.useProxy;
+                    document.body.classList.remove('cinema-mode'); // Ha parancs jön, lássuk a vezérlőt
+                    playVideo();
                 }
-            } catch (e) {
-                console.error('WebSocket üzenet hiba:', e);
-            }
+            } catch(err){}
         };
-
-        ws.onclose = function() {
-            statusLight.style.backgroundColor = '#f00';
-            setTimeout(connectWebSocket, 3000);
-        };
+        ws.onclose = () => setTimeout(connectWs, 3000);
     }
-    
-    connectWebSocket();
 </script>
-
 </body>
 </html>
