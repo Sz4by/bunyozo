@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Szaby Lejátszó</title>
+    <title>Szaby TV Lejátszó</title>
     
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,18 +16,16 @@
             font-family: Arial, sans-serif; background-color: #121212;
             color: #ffffff; display: flex; align-items: center;
             justify-content: center; flex-direction: column;
+            user-select: none;
+            overflow-x: hidden; /* Vízszintes görgetés tiltása */
         }
         
-        /* Ha a videó aktív, letiltjuk a görgetést a háttérben */
-        body.video-active {
-            overflow: hidden;
-        }
+        body.video-active { overflow: hidden; background-color: #000; }
 
         #player-container {
             width: 90%; max-width: 800px; padding: 20px;
             background-color: #1e1e1e; border-radius: 10px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); box-sizing: border-box; 
-            transition: opacity 0.3s;
         }
 
         h1 {
@@ -38,99 +36,72 @@
         }
         #url_section { display: flex; gap: 10px; }
         #url {
-            flex-grow: 1; padding: 10px; font-size: 1em;
+            flex-grow: 1; padding: 10px; font-size: 1.2em; /* Nagyobb betű TV-re */
             border: 1px solid #444; border-radius: 5px;
             background-color: #2a2a2a; color: #f0f0f0;
         }
         #btn_play {
-            padding: 10px 20px; font-size: 1em; font-weight: bold;
+            padding: 10px 20px; font-size: 1.2em; font-weight: bold;
             color: white; background-color: #4a90e2; 
             border: none; border-radius: 5px; cursor: pointer;
-            transition: background-color 0.3s;
         }
-        #btn_play:hover { background-color: #357abd; }
-        #proxy-switch-container {
-            margin-top: 15px; display: flex; align-items: center;
-            justify-content: center; gap: 8px; color: #ccc;
-        }
-        #proxy-toggle { cursor: pointer; }
-        
-        /* --- VIDEÓ STÍLUSOK --- */
-        #videoPlayer {
-            width: 100%; background-color: black; margin-top: 20px;
-            border-radius: 5px; display: none; /* Alapból rejtve */
+        #btn_play:focus, #url:focus, #proxy-toggle:focus {
+            outline: 3px solid #fff; /* Látszódjon a fókusz a menüben */
         }
 
-        /* Ez az osztály aktiválódik lejátszáskor */
+        /* --- VIDEÓ STÍLUSOK (TV MODE) --- */
+        #videoPlayer {
+            display: none;
+            /* Fontos: tabindex miatt fókuszálható lesz */
+            outline: none; 
+        }
+
+        /* Teljes képernyős mód */
         #videoPlayer.full-window {
             display: block !important;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            z-index: 9999; /* Minden más fölött legyen */
-            margin: 0;
-            border-radius: 0;
-            object-fit: contain; /* Megtartja az arányokat fekete sávokkal */
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: 9999; margin: 0; border: none;
+            background: black;
+            object-fit: contain; 
         }
 
-        /* Kilépés gomb (X) stílusa */
-        #close-btn {
-            display: none;
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 10000; /* A videó fölött legyen */
-            background: rgba(0, 0, 0, 0.6);
-            color: white;
-            border: 2px solid white;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            font-size: 20px;
-            cursor: pointer;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.3s;
-        }
-        #close-btn:hover {
-            background: rgba(255, 0, 0, 0.8);
-            border-color: red;
+        /* Visszajelző ikon (Play/Pause/Tekerés) */
+        #feedback-icon {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 100px; color: rgba(255, 255, 255, 0.9);
+            z-index: 10000; display: none; pointer-events: none;
+            text-shadow: 2px 2px 10px #000;
         }
 
-        video:focus, video:active { outline: none; border: none; }
-        #status-light {
-            width: 12px; height: 12px; border-radius: 50%;
-            background-color: #f00; 
-            margin-left: auto; 
-            transition: background-color 0.5s;
+        /* Töltés jelző */
+        #loading-indicator {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: white; font-size: 20px; z-index: 10000; display: none;
         }
     </style>
 </head>
 <body>
 
-<button id="close-btn" title="Bezárás (ESC)">✕</button>
+<div id="feedback-icon">▶</div>
+<div id="loading-indicator">Betöltés...</div>
 
 <div id="player-container">
-    <div style="display: flex; align-items: center; width: 100%;">
-        <h1>Szaby Lejátszó</h1>
-        <div id="status-light" title="Kapcsolat állapota"></div>
-    </div>
+    <h1>Szaby TV Lejátszó</h1>
     
     <form name="frm1" id="frm1" onsubmit="return false;">
-        <div id="url_section" name="url_section">
-            <input type="text" name="url" id="url" placeholder="Illeszd be a linket..."/>
-            <button type="button" name="btn_play" id="btn_play">Play</button>
+        <div id="url_section">
+            <input type="text" name="url" id="url" placeholder="Video link..." autocomplete="off"/>
+            <button type="button" name="btn_play" id="btn_play">Lejátszás</button>
         </div>
     </form>
     
-    <div id="proxy-switch-container">
+    <div style="margin-top: 15px; color: #ccc; text-align: center;">
         <input type="checkbox" id="proxy-toggle" checked>
-        <label for="proxy-toggle">Proxy használata (CORS hibák kikerülésére)</label>
+        <label for="proxy-toggle">Proxy (CORS)</label>
     </div>
     
-    <video id="videoPlayer" controls autoplay muted></video>
+    <video id="videoPlayer" tabindex="0" playsinline></video>
 </div>
 
 <script>
@@ -138,126 +109,164 @@
     var video = document.getElementById('videoPlayer');
     var urlInput = document.getElementById('url');
     var playButton = document.getElementById('btn_play');
-    var closeButton = document.getElementById('close-btn');
-    var statusLight = document.getElementById('status-light');
+    var feedbackIcon = document.getElementById('feedback-icon');
+    var loadingIndicator = document.getElementById('loading-indicator');
     var proxyToggle = document.getElementById('proxy-toggle');
 
-    // --- NÉZET VÁLTÁS (TELJES ABLAK) ---
-    function enterFullWindowMode() {
-        video.classList.add('full-window');
-        document.body.classList.add('video-active');
-        closeButton.style.display = 'flex';
-        video.style.display = 'block';
+    // --- VISUAL FEEDBACK (Hogy lásd mit nyomtál a távirányítón) ---
+    function showFeedback(symbol) {
+        feedbackIcon.innerText = symbol;
+        feedbackIcon.style.display = 'block';
+        feedbackIcon.style.opacity = '1';
+        
+        // Ha van előző timeout, töröljük, ne villogjon
+        if (window.feedbackTimeout) clearTimeout(window.feedbackTimeout);
+        
+        window.feedbackTimeout = setTimeout(() => {
+            feedbackIcon.style.opacity = '0';
+            setTimeout(() => { feedbackIcon.style.display = 'none'; }, 300);
+        }, 800);
     }
 
-    function exitFullWindowMode() {
-        video.pause(); // Megállítjuk a videót kilépéskor
-        video.classList.remove('full-window');
-        document.body.classList.remove('video-active');
-        closeButton.style.display = 'none';
-        video.style.display = 'none'; // Visszarejtjük, hogy ne tolja szét a formot
-        
-        // Opcionális: Ha HLS volt, leállítjuk a töltést
-        if(hls) {
-            hls.stopLoad();
+    // --- IRÁNYÍTÁS LOGIKA ---
+    function togglePlay() {
+        if (video.paused) {
+            video.play();
+            showFeedback('▶');
+        } else {
+            video.pause();
+            showFeedback('⏸');
         }
     }
 
-    // Kilépés gomb eseménye
-    closeButton.addEventListener('click', exitFullWindowMode);
+    function seekVideo(seconds) {
+        if (video.duration) {
+            video.currentTime += seconds;
+            showFeedback(seconds > 0 ? '⏩ +10s' : '⏪ -10s');
+        }
+    }
 
-    // ESC gomb eseménye
-    document.addEventListener('keydown', function(e) {
-        if (e.key === "Escape" && video.classList.contains('full-window')) {
-            exitFullWindowMode();
+    // --- TV TÁVIRÁNYÍTÓ KEZELÉS ---
+    // A videó elemen figyeljük a gombokat
+    video.addEventListener('keydown', function(e) {
+        // Megakadályozzuk, hogy a böngésző görgessen vagy kilépjen
+        e.preventDefault(); 
+        e.stopPropagation();
+
+        console.log("Lenyomott gomb kódja:", e.keyCode, "Key:", e.key);
+
+        switch(e.keyCode) {
+            case 13: // Enter / OK gomb
+            case 32: // Space
+            case 415: // Play (néhány TV-n)
+            case 19: // Pause (néhány TV-n)
+            case 179: // Play/Pause (Samsung/LG)
+                togglePlay();
+                break;
+
+            case 39: // Jobbra nyíl
+            case 417: // Fast Forward
+                seekVideo(15);
+                break;
+
+            case 37: // Balra nyíl
+            case 412: // Rewind
+                seekVideo(-15);
+                break;
+
+            case 10009: // Vissza gomb (Samsung Tizen)
+            case 461:   // Vissza gomb (LG WebOS)
+            case 8:     // Backspace
+            case 27:    // Escape (PC)
+                exitFullWindowMode();
+                break;
+                
+            // Hangerő gombokat általában a TV rendszere kezeli, 
+            // de ha a böngésző elkapja, itt lehetne kezelni.
         }
     });
 
-    // --- LEJÁTSZÓ FUNKCIÓ ---
+    // Ha véletlenül egérrel kattintanak TV-n (air mouse)
+    video.addEventListener('click', () => {
+        togglePlay();
+        video.focus(); // Fókusz visszakerülése
+    });
+
+    // --- TELJES KÉPERNYŐ LOGIKA ---
+    function enterFullWindowMode() {
+        video.classList.add('full-window');
+        document.body.classList.add('video-active');
+        video.style.display = 'block';
+        
+        // KRITIKUS: Fókuszt a videóra kell rakni, különben nem megy a távirányító!
+        setTimeout(() => {
+            video.focus();
+        }, 100);
+    }
+
+    function exitFullWindowMode() {
+        video.pause(); 
+        video.classList.remove('full-window');
+        document.body.classList.remove('video-active');
+        video.style.display = 'none';
+        
+        if(hls) hls.stopLoad();
+        
+        // Fókusz vissza a beviteli mezőre
+        urlInput.focus();
+    }
+
+    // --- LEJÁTSZÁS INDÍTÁSA ---
     function playVideo() {
         var originalUrl = urlInput.value;
-        if (!originalUrl) {
-            alert("Kérlek, adj meg egy URL-t!");
-            return;
-        }
-        
-        // 1. Aktiváljuk a teljes ablakos módot
-        enterFullWindowMode();
+        if (!originalUrl) return;
 
+        enterFullWindowMode(); // Azonnal teljes képernyő és FÓKUSZ
+
+        loadingIndicator.style.display = 'block';
+        
         var useProxy = proxyToggle.checked;
         var finalUrl = useProxy ? `/proxy?url=${encodeURIComponent(originalUrl)}` : originalUrl;
 
-        console.log(`Lejátszás indítása (${useProxy ? 'Proxyval' : 'Közvetlenül'}): ${finalUrl}`);
-
         var isHls = originalUrl.includes('.m3u8') || originalUrl.includes('.txt');
         
-        if (hls) {
-            hls.destroy();
-        }
+        if (hls) hls.destroy();
 
         if (isHls && Hls.isSupported()) {
             hls = new Hls(); 
             hls.loadSource(finalUrl);
             hls.attachMedia(video);
-            
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                video.play().catch(e => console.log("Autoplay blokkolva, interakció szükséges."));
-            });
-            
-            hls.on(Hls.Events.ERROR, function (event, data) {
-                if (data.fatal) {
-                    console.error('Végzetes HLS hiba:', data);
-                }
+                video.play();
+                loadingIndicator.style.display = 'none';
             });
         } else {
             video.src = finalUrl;
-            video.play().catch(e => console.log("Autoplay blokkolva, interakció szükséges."));
+            video.play();
+            video.onplaying = () => { loadingIndicator.style.display = 'none'; };
         }
     }
 
     playButton.addEventListener("click", playVideo);
     
-    // --- WEBSOCKET CSATLAKOZÁS ---
+    // --- WEBSOCKET (Távvezérléshez, ha telefonról küldöd a linket) ---
     function connectWebSocket() {
         const wsProtocol = (location.protocol === 'https:' ? 'wss:' : 'ws:');
         const wsUrl = wsProtocol + '//' + location.host; 
         const ws = new WebSocket(wsUrl);
 
-        ws.onopen = function() {
-            console.log('WebSocket csatlakozva a szerverhez.');
-            statusLight.style.backgroundColor = '#0f0'; 
-            statusLight.title = 'Csatlakozva a mindenttudóhoz';
-        };
-
+        ws.onopen = function() { console.log("WS Connected"); };
+        
         ws.onmessage = function(event) {
             try {
                 const data = JSON.parse(event.data);
-                console.log('Üzenet érkezett a szerverről:', data);
-
                 if (data.type === 'PLAY_VIDEO' && data.url) {
                     urlInput.value = data.url; 
-                    // Ha érkezik parancs, állítsuk be a proxy-t is, ha küldték, vagy alapértelmezetten true
-                    if (data.useProxy !== undefined) {
-                        proxyToggle.checked = data.useProxy;
-                    }
                     playVideo(); 
                 }
-            } catch (e) {
-                console.error('WebSocket üzenet hiba:', e);
-            }
+            } catch (e) {}
         };
-
-        ws.onclose = function() {
-            console.log('WebSocket kapcsolat bontva. Újracsatlakozás 3 másodperc múlva...');
-            statusLight.style.backgroundColor = '#f00'; 
-            statusLight.title = 'Kapcsolat bontva';
-            setTimeout(connectWebSocket, 3000);
-        };
-
-        ws.onerror = function(err) {
-            console.error('WebSocket hiba:', err);
-            ws.close();
-        };
+        ws.onclose = function() { setTimeout(connectWebSocket, 3000); };
     }
     
     connectWebSocket();
